@@ -12,12 +12,33 @@ function contentSync(options) {
 
     var extractCount = 0;
     var fsRoot = null;
+    
+    function checkfileSystem() {
+    	console.log("[contentSync.checkfileSystem] ");
+    	
+    	requestFileSystem(LocalFileSystem.PERSISTENT, 0, onFSSuccess, null);
+    	
+    	function onFSSuccess(fileSystem) {
+    		fileSystem.root.getDirectory("/content-am",{create:true},gotDir,onError);
+    	}
+    	
+    	function gotDir(d) {
+    		console.log("[contentSync.checkfileSystem.gotDir] gotDir "+d);
+    	}
+    	
+    	function onError(e) {
+    		console.log("[contentSync.checkfileSystem.onError] ERROR");
+    		console.log("[contentSync.checkfileSystem.onError] msg: "+JSON.stringify(e));
+    	}
+    	
+    }
 
     function requestZip() {
         requestFileSystem(LocalFileSystem.PERSISTENT, 0, successRequestFileSystem, failRequestFileSystem);
         
         function successRequestFileSystem(fs) {
             fsRoot = fs.root;
+        	//fsRoot = fs.root.getDirectory();
             console.log("Requesting file " + options.zipUrl);
             var reader = new zip.HttpReader(options.zipUrl);
             zip.createReader(reader, extractZip, failCreateReader);
@@ -60,6 +81,7 @@ function contentSync(options) {
                 //var zipWriter = new zip.TextWriter();
                 var zipWriter = new zip.FileWriter(file, zip.getMimeType(entry.filename));
                 entry.getData(zipWriter, function (text) {
+                    console.log("successWroteFile ");
                     //fileWriter.write(text); // comment if using zip.FileWriter
                     successWroteFile();
                 });
@@ -78,7 +100,9 @@ function contentSync(options) {
     }
     
     function createPath(filename) {
+        console.log("createPath " + filename);
         var parentDirectories = filename.split("/");
+        console.log("createPath parentDirectories " + parentDirectories);
         for (var i = 0, l = parentDirectories.length - 1; i < l; ++i) {
             (function () { // Create a closure for the path variable to be correct when logging it
                 var path = parentDirectories.slice(0, i+1).join("/");
@@ -90,7 +114,16 @@ function contentSync(options) {
     }
     
     function openFile() {
-        var file = fsRoot.fullPath + "/" + options.openFile;
+    	
+    	var dirReader = fsRoot.createReader();
+    	
+        //var file = fsRoot.fullPath + "android_asset/www/" + options.openFile; //android_asset/www
+    	//var file = fsRoot.fullPath + options.openFile; //android_asset/www
+    	//var file = options.openFile;
+    	var file = fsRoot.toNativeURL() + options.openFile; //android_asset/www
+        console.log("fsRoot.fullPath " + fsRoot.fullPath);
+        console.log("options.openFile " + options.openFile);
+        console.log("fileSystem.root.name " + fsRoot.name);
         console.log("Redirecting to file " + file);
         $(options.selectorIframe).attr("src", file);
         
@@ -110,6 +143,7 @@ function contentSync(options) {
     
     if (options.zipUrl) {
         requestZip();
+        //checkfileSystem();
     } else {
         console.error("Missing argument: options.zipUrl needs to provide the URL of the ZIP file to download.");
     }
